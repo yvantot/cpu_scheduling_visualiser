@@ -53,7 +53,7 @@ main {
 }
 section[class="instruction"] {
 	flex-shrink: 0;
-	flex-basis: 35vw;
+	flex-basis: 25vw;
 	& > div {
 		margin-bottom: 1.5rem;
 	}
@@ -110,22 +110,13 @@ section[class="table"] {
 	display: flex;
 	flex-grow: 1;
 	flex-direction: column;
-	justify-content: space-between;
 
 	.process {
 		display: grid;
-		grid-template-columns: repeat(7, 1fr);
+		grid-template-columns: repeat(9, 1fr);
 		text-align: center;
 		span {
 			border: var(--light-border);
-		}
-		.avg_turnaround {
-			grid-column-start: 4;
-			grid-column-start: 5;
-		}
-		.avg_waiting {
-			grid-column-start: 5;
-			grid-column-start: 6;
 		}
 	}
 	.process_header {
@@ -182,11 +173,11 @@ footer {
 @keyframes skyfall {
 	0% {
 		opacity: 0;
-		transform: translateX(2rem);
+		transform: translate(2rem);
 	}
 	100% {
 		opacity: 1;
-		transform: translateX(0);
+		transform: translate(0);
 	}
 }
 .process_add_anim {

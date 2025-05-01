@@ -11,21 +11,42 @@ const ELEMENTS = {
 	BURST_CONTAINER: document.getElementById("burst_container"),
 	PRIORITY_CONTAINER: document.getElementById("priority_container"),
 	QUANTUM_CONTAINER: document.getElementById("quantum_container"),
+	TABLE_COLUMN_TITLE: document.querySelector(".process_column_title"),
 };
 
-const PROCESS_ENUM = {
-	PID: 0,
-	AT: 1,
-	BT: 2,
-	PR: 3,
-	CT: 4,
-	TAT: 5,
-	WT: 6,
-	IT: 7,
-};
+function order_enum(obj) {
+	const keys = Object.keys(obj);
+	const ordered_enum = {};
+	for (let i = 0; i < keys.length; i++) {
+		ordered_enum[keys[i]] = i;
+	}
+	return Object.freeze(ordered_enum);
+}
+
+// Order will reflect in UI
+const PROCESS_ENUM = order_enum({
+	PID: null,
+	AT: null,
+	BT: null,
+	PR: null,
+	ST: null,
+	CT: null,
+	IT: null,
+	TAT: null,
+	WT: null,
+});
 
 (() => {
-	const { INSTRUCTION, ACTIONS, ALGORITHM, ARRIVAL, BURST, PRIORITY, PRIORITY_CONTAINER, QUANTUM_CONTAINER } = ELEMENTS;
+	const { INSTRUCTION, ACTIONS, ALGORITHM, ARRIVAL, BURST, PRIORITY, PRIORITY_CONTAINER, QUANTUM_CONTAINER, TABLE_COLUMN_TITLE } = ELEMENTS;
+
+	const process_enum_keys = Object.keys(PROCESS_ENUM);
+	let column_title = "";
+	for (let i = 0; i < process_enum_keys.length; i++) {
+		const key = process_enum_keys[i];
+		column_title += `<span>${key}</span>`;
+	}
+
+	TABLE_COLUMN_TITLE.innerHTML = column_title;
 
 	ALGORITHM.addEventListener("change", () => {
 		update_table();
@@ -56,6 +77,7 @@ const PROCESS_ENUM = {
 		const parent = target.closest(".action_container");
 		switch (parent.dataset.name) {
 			case "add_random":
+				const algorithm = ALGORITHM.value;
 				const arrival_count = ARRIVAL.children.length;
 				const burst_count = BURST.children.length;
 				const priority_count = PRIORITY.children.length;
@@ -70,14 +92,16 @@ const PROCESS_ENUM = {
 
 				if (arrival_count > burst_count) {
 					BURST.insertBefore(rand_burst, BURST.lastElementChild);
-					if (priority_count <= arrival_count) PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
+					if (priority_count <= arrival_count && algorithm === "prio") PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
 				} else if (arrival_count < burst_count) {
 					ARRIVAL.insertBefore(rand_arrival, ARRIVAL.lastElementChild);
-					if (priority_count <= arrival_count) PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
+					if (priority_count <= arrival_count && algorithm === "prio") PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
+				} else if (arrival_count > priority_count && algorithm === "prio") {
+					if (algorithm === "prio") PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
 				} else {
 					ARRIVAL.insertBefore(rand_arrival, ARRIVAL.lastElementChild);
 					BURST.insertBefore(rand_burst, BURST.lastElementChild);
-					if (priority_count <= arrival_count) PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
+					if (priority_count <= arrival_count && algorithm === "prio") PRIORITY.insertBefore(rand_priority, PRIORITY.lastElementChild);
 				}
 				update_table();
 				break;
@@ -144,7 +168,7 @@ function calculate_time(algorithm) {
 	// WT = TAT - BT
 
 	const { ARRIVAL, BURST, PRIORITY } = ELEMENTS;
-	const { PID, AT, BT, PR, CT } = PROCESS_ENUM;
+	const { PID, AT, BT, PR, ST, CT, TAT, WT, IT } = PROCESS_ENUM;
 
 	let processes = [];
 
@@ -154,7 +178,12 @@ function calculate_time(algorithm) {
 		const arrival = parseInt(ARRIVAL.children[i]?.innerText);
 		const burst = parseInt(BURST.children[i]?.innerText);
 		const priority = parseInt(PRIORITY.children[i]?.innerText);
-		processes.push([i, arrival, burst, priority]);
+		const process = [];
+		process[PID] = i;
+		process[AT] = arrival;
+		process[BT] = burst;
+		process[PR] = priority;
+		processes.push(process);
 	}
 
 	// Sort based on arrival_time (FCFS)
@@ -205,11 +234,14 @@ function calculate_time(algorithm) {
 		const curr_turnaround = curr_completion - curr_arrival;
 		const curr_waiting = curr_turnaround - curr_burst;
 		const curr_idle = i === 0 ? 0 + curr_arrival : curr_arrival - processes[i - 1][PROCESS_ENUM.CT] > 0 ? curr_arrival - processes[i - 1][PROCESS_ENUM.CT] : 0;
+		const curr_start = curr_completion - curr_burst;
 
-		processes[i].push(curr_completion);
-		processes[i].push(curr_turnaround);
-		processes[i].push(curr_waiting);
-		processes[i].push(curr_idle);
+		processes[i][ST] = curr_start;
+		processes[i][CT] = curr_completion;
+		processes[i][TAT] = curr_turnaround;
+		processes[i][WT] = curr_waiting;
+		processes[i][IT] = curr_idle;
+		console.log(processes[i]);
 	}
 
 	return processes;
@@ -219,7 +251,7 @@ function update_table() {
 	const { TABLE, CHART, ALGORITHM } = ELEMENTS;
 	TABLE.innerHTML = "";
 
-	const { PID, AT, BT, CT, TAT, WT, IT } = PROCESS_ENUM;
+	const { PID, AT, BT, CT, TAT, WT, IT, PR } = PROCESS_ENUM;
 	const processes = calculate_time(ALGORITHM.value);
 
 	let gantt_chart = create_element("div");
@@ -237,18 +269,22 @@ function update_table() {
 		sum_turnaround += process_time[TAT] ? process_time[TAT] : 0;
 		sum_waiting += process_time[WT] ? process_time[WT] : 0;
 
+		let process_info = "";
+		const process_enum_keys = Object.keys(PROCESS_ENUM);
+		for (let i = 0; i < process_enum_keys.length; i++) {
+			const key = PROCESS_ENUM[process_enum_keys[i]];
+			if (i === 0) {
+				process_info += `<span class="no_opacity">${process_time[key] + 1}</span>`;
+			} else {
+				process_info += `<span class="no_opacity">${process_time[key] || process_time[key] === 0 ? process_time[key] : "-"}</span>`;
+			}
+		}
+
 		const process = create_element("div", {
 			className: "process",
-			innerHTML: `
-	            <span class="no_opacity">${process_time[PID] + 1}</span>
-	            <span class="no_opacity">${process_time[AT] || process_time[AT] === 0 ? process_time[AT] : "-"}</span>
-	            <span class="no_opacity">${process_time[BT] || process_time[BT] === 0 ? process_time[BT] : "-"}</span>
-	            <span class="no_opacity">${process_time[CT] || process_time[CT] === 0 ? process_time[CT] : "-"}</span>
-	            <span class="no_opacity">${process_time[TAT] || process_time[TAT] === 0 ? process_time[TAT] : "-"}</span>
-				<span class="no_opacity">${process_time[WT] || process_time[WT] === 0 ? process_time[WT] : "-"}</span>
-				<span class="no_opacity">${process_time[IT] || process_time[IT] === 0 ? process_time[IT] : "-"}</span>
-	        `,
+			innerHTML: process_info,
 		});
+
 		processes_el.push(process);
 		TABLE.appendChild(process);
 	}
@@ -262,9 +298,7 @@ function update_table() {
 		}, 200 * i);
 
 		for (let k = 0; k < process_children.length; k++) {
-			setTimeout(() => {
-				process_children[k].classList.add("process_add_anim");
-			}, 100 * (i + k));
+			process_children[k].style = `animation: skyfall ${150 * (i + k)}ms ease 0s 1 normal forwards;`;
 		}
 	}
 
@@ -276,10 +310,12 @@ function update_table() {
 	const average_waiting = sum_waiting / processes.length;
 	const process_average_turnaround = create_element("span", {
 		className: "avg_turnaround",
+		style: `grid-column-start: ${TAT}; grid-column-start: ${TAT + 1};`,
 		innerHTML: `${average_turnaround.toFixed(2)}`,
 	});
 	const process_average_waiting = create_element("span", {
 		className: "avg_waiting",
+		style: `grid-column-start: ${WT}; grid-column-start: ${WT + 1};`,
 		innerHTML: `${average_waiting.toFixed(2)}`,
 	});
 	const process_average = create_element("div", {
