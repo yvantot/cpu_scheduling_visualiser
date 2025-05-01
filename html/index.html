@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>CPU Scheduling Visualisation</title>
+		<meta name="description" content="Made by students under Prof. Gio guidance" />
+		<meta name="author" content="Jun Ivanne Dalman" />
+		<link rel="stylesheet" href="../css/index.css" />
+		<script src="../js/index.js" defer></script>
+	</head>
+	<body>
+		<header>
+			<div class="header_info">
+				<p class="title">CPU Scheduling Visualisation</p>
+				<p class="description">Education tool to help students learn CPU Scheduling</p>
+			</div>
+		</header>
+		<main>
+			<section class="instruction">
+				<div class="header_info">
+					<p class="title">Instruction</p>
+					<p class="description">Configure the processes here</p>
+				</div>
+				<div class="instruction_body">
+					<p>Algorithm</p>
+					<select name="algorithm" id="select_algorithm">
+						<option value="fcfs">First Come First Serve (FSCS)</option>
+						<option value="sjf">Shortest Job First (SJF)</option>
+						<option value="prio">Priority (Non-Preemptive)</option>
+						<!-- <option value="rbn">Round Robin</option> -->
+					</select>
+					<br />
+					<br />
+					<div id="arrival_container">
+						<p>Arrival Time</p>
+						<div id="arrival_time" class="arrival_time time_container">
+							<div class="time_inputs new_input" contenteditable="true"></div>
+						</div>
+					</div>
+					<div id="burst_container">
+						<p>Burst Time</p>
+						<div id="burst_time" class="burst_time time_container">
+							<div class="time_inputs new_input" contenteditable="true"></div>
+						</div>
+					</div>
+					<div id="priority_container" class="no_display">
+						<p>Priority</p>
+						<div id="process_priority" class="process_priority time_container">
+							<div class="time_inputs new_input" contenteditable="true"></div>
+						</div>
+					</div>
+					<div id="quantum_container" class="no_display">
+						<p>Quantum Time</p>
+						<div id="quantum_time" class="quantum_time time_container">
+							<div class="time_inputs new_input" contenteditable="true"></div>
+						</div>
+					</div>
+				</div>
+				<div class="instruction_actions">
+					<div class="action_container" data-name="add_random">
+						<span>Add random</span>
+						<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#434343"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" /></svg>
+					</div>
+					<div class="action_container" data-name="reset_input">
+						<span>Visualise</span>
+						<div></div>
+					</div>
+					<div class="action_container" data-name="reset_input">
+						<span>Reset inputs</span>
+						<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#434343"><path d="M480-80q-75 0-140.5-28.5t-114-77q-48.5-48.5-77-114T120-440h80q0 117 81.5 198.5T480-160q117 0 198.5-81.5T760-440q0-117-81.5-198.5T480-720h-6l62 62-56 58-160-160 160-160 56 58-62 62h6q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-440q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-80Z" /></svg>
+					</div>
+
+					<!-- Optional actions here -->
+				</div>
+			</section>
+			<section class="table">
+				<div class="process_header">
+					<p>Process Table</p>
+					<div class="process process_column_title">
+						<span>Process</span>
+						<span>AT</span>
+						<span>BT</span>
+						<span>CT</span>
+						<span>TAT</span>
+						<span>WT</span>
+						<span>IT</span>
+					</div>
+					<div class="process_table"></div>
+				</div>
+				<div class="process_chart">
+					<p>Gantt Chart</p>
+					<div class="process_chart_container"></div>
+				</div>
+			</section>
+		</main>
+		<footer>
+			<p>Made by students under the guidance of CCC Prof. Gio</p>
+		</footer>
+	</body>
+</html>
