@@ -193,13 +193,17 @@ footer {
 	display: none;
 }
 @media screen and (0 <= width <= 850px) {
+	*,
+	*::before,
+	*::after {
+		font-size: 10px;
+	}
 	main {
 		display: flex;
 		flex-direction: column;
 		section[class="instruction"] {
 			.instruction_body {
 				.time_container {
-					max-width: 100% !important;
 				}
 			}
 		}

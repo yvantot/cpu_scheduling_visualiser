@@ -28,10 +28,10 @@ const PROCESS_ENUM = order_enum({
 	PID: null,
 	AT: null,
 	BT: null,
-	PR: null,
 	ST: null,
 	CT: null,
 	IT: null,
+	PR: null,
 	TAT: null,
 	WT: null,
 });
