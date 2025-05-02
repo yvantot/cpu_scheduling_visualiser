@@ -1,9 +1,12 @@
+// AHA Moment: null == null AND undefined, you can check for both using non-strict equality comparison
+
 const ELEMENTS = {
 	INSTRUCTION: document.querySelector("div[class='instruction_body']"),
 	ACTIONS: document.querySelector("div[class='instruction_actions']"),
 	ARRIVAL: document.getElementById("arrival_time"),
 	BURST: document.getElementById("burst_time"),
 	PRIORITY: document.getElementById("process_priority"),
+	QUANTUM: document.getElementById("quantum_time"),
 	TABLE: document.querySelector("div[class*='process_table']"),
 	CHART: document.querySelector("div[class*='process_chart_container']"),
 	ALGORITHM: document.getElementById("select_algorithm"),
@@ -119,14 +122,17 @@ const PROCESS_ENUM = order_enum({
 	});
 
 	INSTRUCTION.addEventListener("keydown", (event) => {
-		// Necessary to avoid uncertain behaviour where after keystroke, the value of target is still not updated
+		// Timeout is necessary to avoid behaviour where after keystroke, the value of target is still not updated
 		setTimeout(() => {
 			const { target } = event;
 			const target_parent = target.parentElement;
 
-			// Return if quantum time
-			if (target_parent.classList.contains("quantum_time")) return;
 			if (!is_numbers_only(parseInt(event.key)) && event.key !== "Backspace") return;
+
+			if (target_parent.classList.contains("quantum_time")) {
+				update_table();
+				return;
+			}
 
 			const parent_children = target_parent.children;
 			let is_all_defined = true;
@@ -153,95 +159,198 @@ const PROCESS_ENUM = order_enum({
 					}
 				}
 			}
-
-			// Generate table
 			update_table();
 		}, 100);
 	});
 })();
 
 function calculate_time(algorithm) {
-	// -- Formula --
+	// --> Formula
 	// CT = if start -> AT + BT else -> Previous CT + BT
 	// IT = Previous CT - AT
 	// TAT = CT - AT
 	// WT = TAT - BT
 
-	const { ARRIVAL, BURST, PRIORITY } = ELEMENTS;
+	const { ARRIVAL, BURST, PRIORITY, QUANTUM } = ELEMENTS;
 	const { PID, AT, BT, PR, ST, CT, TAT, WT, IT } = PROCESS_ENUM;
 
 	let processes = [];
 
-	// Prepare the processes
 	// '- 1' to skip the new_input elements
 	for (let i = 0; i < ARRIVAL.children.length - 1; i++) {
 		const arrival = parseInt(ARRIVAL.children[i]?.innerText);
 		const burst = parseInt(BURST.children[i]?.innerText);
 		const priority = parseInt(PRIORITY.children[i]?.innerText);
+
 		const process = [];
 		process[PID] = i;
 		process[AT] = arrival;
 		process[BT] = burst;
 		process[PR] = priority;
+
 		processes.push(process);
 	}
 
-	// Sort based on arrival_time (FCFS)
-	if (algorithm === "fcfs") processes.sort((a, b) => a[AT] - b[AT]);
+	// Since inputs might be unordered. Sort them by their arrival time no matter the algorithm
+	processes.sort((a, b) => a[AT] - b[AT]);
 
-	if (algorithm === "sjf" || algorithm === "prio") {
-		processes.sort((a, b) => a[AT] - b[AT]);
+	switch (algorithm) {
+		// --> Non-preemptive
+		case "fcfs":
+		case "sjf":
+		case "prio":
+			if (algorithm !== "fcfs") {
+				// SJF (Shortest Job First)
+				// SJF picks an arrived process from processes with the lowest burst time, using arrival time as a tiebreaker
 
-		// SJF is an algorithm that orders the process by their burst time, it picks the one with shortest time
-		// If they have the same burst time, pick the earliest one that arrived
+				// Priority (Non-preemptive)
+				// Same as SJF but with priority
 
-		const processes_temp = [];
-		let curr_time = 0;
+				const processes_temp = [];
+				let curr_time = 0;
 
-		while (processes.length > 0) {
-			// Get the arrvied processes
-			const arrived = processes.filter((process) => process[AT] <= curr_time);
+				while (processes.length) {
+					// Get the arrvied processes
+					const arrived = processes.filter((process) => process[AT] <= curr_time);
 
-			if (arrived.length === 0) {
-				curr_time = processes[0][AT];
-				processes_temp.push(processes.shift());
-			} else {
-				// Arrived, they may be unordered
-				if (algorithm === "sjf") {
-					if (arrived.length > 1) arrived.sort((a, b) => (a[BT] !== b[BT] ? a[BT] - b[BT] : a[AT] - b[AT]));
-				} else if (algorithm === "prio") {
-					if (arrived.length > 1) arrived.sort((a, b) => (a[PR] !== b[PR] ? b[PR] - a[PR] : a[AT] - b[AT]));
+					if (arrived.length === 0) {
+						// If no process arrived, then the time progressed to the earliest (not-yet arrived) process
+						curr_time = processes[0][AT];
+						// And execute it
+						processes_temp.push(processes.shift());
+					} else {
+						// If processes arrived, then sort them by their algorithm
+						if (algorithm === "sjf") {
+							if (arrived.length > 1) arrived.sort((a, b) => (a[BT] !== b[BT] ? a[BT] - b[BT] : a[AT] - b[AT]));
+						} else if (algorithm === "prio") {
+							if (arrived.length > 1) arrived.sort((a, b) => (a[PR] !== b[PR] ? b[PR] - a[PR] : a[AT] - b[AT]));
+						}
+						// Find the arrived process from the processes
+						// It is not accurate to push the first element in arrived process because the order of processes is not sorted by their burst time and not time-accurate
+						const index = processes.findIndex((process) => process[PID] === arrived[0][PID]);
+						// Execute the process, note that the time is still not running
+						processes_temp.push(processes.splice(index, 1)[0]);
+					}
+
+					// Here, we will run the time, emulating the process of executing processes
+					// Take the process we just pushed
+					const last = processes_temp.at(-1);
+					// Compute the completion time, and set the current time to it
+					curr_time = Math.max(curr_time, last[AT]) + last[BT];
+				}
+				processes = processes_temp.map((value) => value);
+			}
+			break;
+		// --> Preemptive
+		case "rbn":
+			if (!is_numbers_only(QUANTUM.innerText)) break;
+
+			const quantum_time = parseInt(QUANTUM.innerText);
+			let curr_time = 0;
+
+			const process_queue = [];
+			const waiting = processes.map((p) => {
+				const proc = [...p];
+				proc.remaining = p[BT];
+				return proc;
+			});
+			const completed = [];
+			const timeline = [];
+
+			while (waiting.length || process_queue.length) {
+				// Enqueue all processes that have arrived by current time
+				for (let i = 0; i < waiting.length; ) {
+					if (waiting[i][AT] <= curr_time) {
+						process_queue.push(waiting.splice(i, 1)[0]);
+					} else {
+						i++;
+					}
 				}
 
-				const index = processes.findIndex((process) => process[PID] === arrived[0][PID]);
-				processes_temp.push(processes.splice(index, 1)[0]);
+				// If nothing is ready, fast-forward to next arrival
+				if (process_queue.length === 0 && waiting.length > 0) {
+					curr_time = waiting[0][AT];
+					continue;
+				} else if (process_queue.length === 0) {
+					break; // No more processes to execute
+				}
+
+				// Round-robin step
+				const proc = process_queue.shift();
+
+				// Set start time if it's the first time executing
+				if (proc[ST] === undefined) {
+					proc[ST] = curr_time;
+				}
+
+				const run_time = Math.min(proc.remaining, quantum_time);
+				timeline.push({ pid: proc[PID], start: curr_time, duration: run_time });
+				curr_time += run_time;
+				proc.remaining -= run_time;
+
+				// Recheck arrivals that may have come during this quantum
+				for (let i = 0; i < waiting.length; ) {
+					if (waiting[i][AT] <= curr_time) {
+						process_queue.push(waiting.splice(i, 1)[0]);
+					} else {
+						i++;
+					}
+				}
+
+				if (proc.remaining > 0) {
+					process_queue.push(proc); // Still needs CPU time
+				} else {
+					proc[CT] = curr_time;
+					completed.push(proc);
+				}
 			}
 
-			// Calculate the updated time
-			const last = processes_temp.at(-1);
-			curr_time = Math.max(curr_time, last[AT]) + last[BT];
-		}
-		processes = processes_temp;
+			// Sort completed processes by their original PID to maintain input order for output
+			completed.sort((a, b) => a[PID] - b[PID]);
+
+			// Fill in TAT, WT, IT for each completed process
+			for (let i = 0; i < completed.length; i++) {
+				const p = completed[i];
+				const arrival = p[AT];
+				const burst = p[BT];
+				const completion = p[CT];
+				const startTime = p[ST];
+
+				p[TAT] = completion - arrival;
+				p[WT] = p[TAT] - burst;
+				p[IT] = startTime - arrival;
+			}
+
+			processes = completed;
+			break;
+		case "srtf":
+		case "preemp_prio":
+			break;
 	}
+	if (algorithm !== "rbn") {
+		for (let i = 0; i < processes.length; i++) {
+			const [_, curr_arrival, curr_burst] = processes[i];
 
-	for (let i = 0; i < processes.length; i++) {
-		const [_, curr_arrival, curr_burst] = processes[i];
+			// Handles three state: start, idle, and not idle
+			// If start, current arrival + current burst, otherwise,
+			// If was idle, then current process arrival + burst, otherwise, previous process completion + current burst
 
-		// Handles three state: start, idle, and not idle
-		// If start, current arrival + current burst, otherwise,
-		// If was idle, then current process arrival + burst, otherwise, previous process completion + current burst
-		const curr_completion = i === 0 ? curr_arrival + curr_burst : curr_arrival > processes[i - 1][PROCESS_ENUM.CT] ? curr_arrival + curr_burst : processes[i - 1][PROCESS_ENUM.CT] + curr_burst;
-		const curr_turnaround = curr_completion - curr_arrival;
-		const curr_waiting = curr_turnaround - curr_burst;
-		const curr_idle = i === 0 ? 0 + curr_arrival : curr_arrival - processes[i - 1][PROCESS_ENUM.CT] > 0 ? curr_arrival - processes[i - 1][PROCESS_ENUM.CT] : 0;
-		const curr_start = curr_completion - curr_burst;
+			// AHA Moment: a > b ? a : b --> Math.max(a,b)
+			// AHA Moment: a < b ? a : b --> Math.min(a,b)
 
-		processes[i][ST] = curr_start;
-		processes[i][CT] = curr_completion;
-		processes[i][TAT] = curr_turnaround;
-		processes[i][WT] = curr_waiting;
-		processes[i][IT] = curr_idle;
-		console.log(processes[i]);
+			const curr_completion = i === 0 ? curr_arrival + curr_burst : Math.max(curr_arrival, processes[i - 1][PROCESS_ENUM.CT]) + curr_burst;
+			const curr_turnaround = curr_completion - curr_arrival;
+			const curr_waiting = curr_turnaround - curr_burst;
+			const curr_idle = i === 0 ? 0 + curr_arrival : Math.max(0, curr_arrival - processes[i - 1][PROCESS_ENUM.CT]);
+
+			const curr_start = curr_completion - curr_burst;
+
+			processes[i][ST] = curr_start;
+			processes[i][CT] = curr_completion;
+			processes[i][TAT] = curr_turnaround;
+			processes[i][WT] = curr_waiting;
+			processes[i][IT] = curr_idle;
+		}
 	}
 
 	return processes;
@@ -333,6 +442,7 @@ function update_table() {
 }
 
 function is_numbers_only(str, allow_space = false) {
+	if (isNaN(str)) return false;
 	if (str.length === 0) return false;
 	if (allow_space) return /^\s*[\d]+\s*$/.test(str);
 	else return /^[\d]+$/.test(str);
