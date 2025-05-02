@@ -159,10 +159,11 @@ section[class="visual"] {
 }
 footer {
 	position: fixed;
-	bottom: 1rem;
+	top: 1rem;
 	left: 1rem;
+	opacity: 0.5;
 	p {
-		font-size: 0.9rem;
+		font-size: 0.8rem;
 	}
 }
 @keyframes opacity_show {
