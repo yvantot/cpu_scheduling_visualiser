@@ -220,3 +220,15 @@ footer {
 		}
 	}
 }
+.practice_on {
+	/* IDK */
+}
+.right_answer {
+	background-color: hsl(120, 50%, 80%);
+}
+.wrong_answer {
+	background-color: hsl(0, 50%, 80%);
+}
+.finish_practice {
+	background-color: hsl(0, 50%, 80%);
+}

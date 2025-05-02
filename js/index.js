@@ -116,7 +116,43 @@ const PROCESS_ENUM = order_enum({
 						inputs[i].remove();
 					}
 				}
+				update_gantt_chart([]);
 				update_table();
+				break;
+			case "practice_mode":
+				const is_practice_on = document.documentElement.classList.contains("practice_on");
+				const instruction_text = parent.querySelector("span");
+				if (is_practice_on) {
+					instruction_text.innerText = "Practice";
+					document.documentElement.classList.remove("practice_on");
+					parent.classList.remove("finish_practice");
+					const answers = document.querySelectorAll("span[data-value]");
+					let score = 0;
+					for (let i = 0; i < answers.length; i++) {
+						const correct_answer = answers[i].dataset.value;
+						const user_answer = answers[i].innerText;
+						if (correct_answer === user_answer.replace(/\s/g, "")) {
+							score += 1;
+							answers[i].classList.add("right_answer");
+						} else {
+							answers[i].classList.add("wrong_answer");
+						}
+					}
+					setTimeout(() => {
+						alert(`You scored ${score}/${answers.length}`);
+						update_table();
+					}, 100);
+				} else {
+					const answers = document.querySelectorAll("span[data-value]");
+					for (let i = 0; i < answers.length; i++) {
+						answers[i].classList.remove("right_answer", "wrong_answer");
+					}
+					instruction_text.innerText = "Finish?";
+					parent.classList.add("finish_practice");
+					document.documentElement.classList.add("practice_on");
+					update_table();
+				}
+
 				break;
 		}
 	});
@@ -360,6 +396,7 @@ function calculate_time(algorithm) {
 }
 
 function update_gantt_chart(processes) {
+	const is_practice_on = document.documentElement.classList.contains("practice_on");
 	const { CHART } = ELEMENTS;
 	const { PID } = PROCESS_ENUM;
 	console.log(processes);
@@ -367,7 +404,9 @@ function update_gantt_chart(processes) {
 		style: `grid-template-columns: repeat(${Math.min(10, processes.length)}, 1fr);`,
 	});
 	for (let i = 0; i < processes.length; i++) {
-		gantt_chart.appendChild(create_element("span", { className: `no_opacity process_order`, innerHTML: `${parseInt(processes[i][PID]) + 1}` }));
+		const info = create_element("span", { contentEditable: is_practice_on, className: `no_opacity process_order`, innerHTML: `${!is_practice_on ? parseInt(processes[i][PID]) + 1 : ""}` });
+		if (is_practice_on) info.dataset.value = parseInt(processes[i][PID]) + 1;
+		gantt_chart.appendChild(info);
 	}
 
 	const gantt_chart_children = gantt_chart.children;
@@ -382,6 +421,7 @@ function update_gantt_chart(processes) {
 }
 
 function update_table() {
+	const is_practice_on = document.documentElement.classList.contains("practice_on");
 	const { TABLE, CHART, ALGORITHM } = ELEMENTS;
 	TABLE.innerHTML = "";
 
@@ -400,23 +440,35 @@ function update_table() {
 		sum_turnaround += process_time[TAT] ? process_time[TAT] : 0;
 		sum_waiting += process_time[WT] ? process_time[WT] : 0;
 
-		let process_info = "";
+		const process_info = document.createDocumentFragment();
 		const process_enum_keys = Object.keys(PROCESS_ENUM);
 		for (let i = 0; i < process_enum_keys.length; i++) {
 			const key = PROCESS_ENUM[process_enum_keys[i]];
+			const info = create_element("span", {
+				className: "no_opacity",
+			});
 			if (i === 0) {
-				process_info += `<span class="no_opacity">${process_time[key] + 1}</span>`;
+				info.innerHTML = `${process_time[key] + 1}`;
 			} else {
-				process_info += `<span class="no_opacity">${process_time[key] || process_time[key] === 0 ? process_time[key] : "-"}</span>`;
+				if (key === AT || key === BT || key === PR || !is_practice_on) {
+					info.contentEditable = false;
+					info.textContent = process_time[key] || process_time[key] === 0 ? process_time[key] : "-";
+				} else {
+					info.contentEditable = true;
+					info.dataset.value = process_time[key] || process_time[key] === 0 ? process_time[key] : "-";
+					info.textContent = "";
+				}
 			}
+			process_info.appendChild(info);
 		}
 
 		const process = create_element("div", {
 			className: "process",
-			innerHTML: process_info,
 		});
 
 		processes_el.push(process);
+
+		process.appendChild(process_info);
 		TABLE.appendChild(process);
 	}
 
