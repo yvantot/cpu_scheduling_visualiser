@@ -171,7 +171,7 @@ function calculate_time(algorithm) {
 	// TAT = CT - AT
 	// WT = TAT - BT
 
-	const { ARRIVAL, BURST, PRIORITY, QUANTUM } = ELEMENTS;
+	const { ARRIVAL, BURST, PRIORITY, QUANTUM, CHART } = ELEMENTS;
 	const { PID, AT, BT, PR, ST, CT, TAT, WT, IT } = PROCESS_ENUM;
 
 	let processes = [];
@@ -240,6 +240,7 @@ function calculate_time(algorithm) {
 				}
 				processes = processes_temp.map((value) => value);
 			}
+			update_gantt_chart(processes);
 			break;
 		// --> Preemptive
 		case "rbn":
@@ -275,6 +276,7 @@ function calculate_time(algorithm) {
 					break; // No more processes to execute
 				}
 
+				// Follows the FIFO principle
 				// Round-robin step
 				const proc = process_queue.shift();
 
@@ -284,7 +286,9 @@ function calculate_time(algorithm) {
 				}
 
 				const run_time = Math.min(proc.remaining, quantum_time);
-				timeline.push({ pid: proc[PID], start: curr_time, duration: run_time });
+				const process_history = [];
+				process_history[PID] = proc[PID];
+				timeline.push([process_history]);
 				curr_time += run_time;
 				proc.remaining -= run_time;
 
@@ -305,23 +309,22 @@ function calculate_time(algorithm) {
 				}
 			}
 
-			// Sort completed processes by their original PID to maintain input order for output
-			completed.sort((a, b) => a[PID] - b[PID]);
-
 			// Fill in TAT, WT, IT for each completed process
 			for (let i = 0; i < completed.length; i++) {
 				const p = completed[i];
 				const arrival = p[AT];
 				const burst = p[BT];
 				const completion = p[CT];
-				const startTime = p[ST];
+				const idle = i === 0 ? 0 + arrival : Math.max(0, arrival - completed[i - 1][CT]);
 
 				p[TAT] = completion - arrival;
 				p[WT] = p[TAT] - burst;
-				p[IT] = startTime - arrival;
+				p[IT] = idle;
 			}
 
 			processes = completed;
+			console.log(timeline);
+			update_gantt_chart(timeline);
 			break;
 		case "srtf":
 		case "preemp_prio":
@@ -356,6 +359,28 @@ function calculate_time(algorithm) {
 	return processes;
 }
 
+function update_gantt_chart(processes) {
+	const { CHART } = ELEMENTS;
+	const { PID } = PROCESS_ENUM;
+	console.log(processes);
+	let gantt_chart = create_element("div", {
+		style: `grid-template-columns: repeat(${Math.min(10, processes.length)}, 1fr);`,
+	});
+	for (let i = 0; i < processes.length; i++) {
+		gantt_chart.appendChild(create_element("span", { className: `no_opacity process_order`, innerHTML: `${parseInt(processes[i][PID]) + 1}` }));
+	}
+
+	const gantt_chart_children = gantt_chart.children;
+	for (let i = 0; i < processes.length; i++) {
+		setTimeout(() => {
+			gantt_chart_children[i].classList.add("process_add_anim");
+		}, 50 * i);
+	}
+
+	CHART.innerHTML = "";
+	CHART.appendChild(gantt_chart);
+}
+
 function update_table() {
 	const { TABLE, CHART, ALGORITHM } = ELEMENTS;
 	TABLE.innerHTML = "";
@@ -363,7 +388,6 @@ function update_table() {
 	const { PID, AT, BT, CT, TAT, WT, IT, PR } = PROCESS_ENUM;
 	const processes = calculate_time(ALGORITHM.value);
 
-	let gantt_chart = create_element("div");
 	let sum_turnaround = 0;
 	let sum_waiting = 0;
 	const processes_el = [];
@@ -371,8 +395,6 @@ function update_table() {
 	// Add processes
 	for (let i = 0; i < processes.length; i++) {
 		const process_time = processes[processes.findIndex((process) => process[PID] === i)];
-
-		gantt_chart.appendChild(create_element("span", { className: `no_opacity process_order`, innerHTML: `${processes[i][PID] + 1}` }));
 
 		// Calculate the average
 		sum_turnaround += process_time[TAT] ? process_time[TAT] : 0;
@@ -398,21 +420,14 @@ function update_table() {
 		TABLE.appendChild(process);
 	}
 
-	const gantt_chart_children = gantt_chart.children;
+	// Animation for processes
 	for (let i = 0; i < processes_el.length; i++) {
 		const process_children = processes_el[i].children;
-
-		setTimeout(() => {
-			gantt_chart_children[i].classList.add("process_add_anim");
-		}, 200 * i);
 
 		for (let k = 0; k < process_children.length; k++) {
 			process_children[k].style = `animation: skyfall ${150 * (i + k)}ms ease 0s 1 normal forwards;`;
 		}
 	}
-
-	CHART.innerHTML = "";
-	CHART.appendChild(gantt_chart);
 
 	// Add average
 	const average_turnaround = sum_turnaround / processes.length;
