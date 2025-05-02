@@ -157,13 +157,12 @@ const PROCESS_ENUM = order_enum({
 		}
 	});
 
-	INSTRUCTION.addEventListener("keydown", (event) => {
-		// Timeout is necessary to avoid behaviour where after keystroke, the value of target is still not updated
+	INSTRUCTION.addEventListener("input", (event) => {
 		setTimeout(() => {
 			const { target } = event;
 			const target_parent = target.parentElement;
 
-			if (!is_numbers_only(parseInt(event.key)) && event.key !== "Backspace") return;
+			if (!is_numbers_only(target.innerText)) return;
 
 			if (target_parent.classList.contains("quantum_time")) {
 				update_table();
