@@ -107,6 +107,7 @@ section[class="instruction"] {
 	}
 }
 section[class="table"] {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 
@@ -158,12 +159,14 @@ section[class="visual"] {
 	flex-basis: 25vw;
 }
 footer {
-	position: fixed;
-	top: 1rem;
+	user-select: none;
+	position: absolute;
+	bottom: 1rem;
 	left: 1rem;
 	opacity: 0.5;
+
 	p {
-		font-size: 0.8rem;
+		font-size: 0.7rem;
 	}
 }
 @keyframes opacity_show {
@@ -232,4 +235,11 @@ footer {
 }
 .finish_practice {
 	background-color: hsl(0, 50%, 80%);
+}
+.grid-visual-header {
+	background-color: hsla(0, 0%, 0%, 0.1);
+	font-size: 1rem;
+	border: 1px solid var(--light-gray);
+	user-select: none;
+	text-align: center;
 }

@@ -17,6 +17,27 @@ const ELEMENTS = {
 	TABLE_COLUMN_TITLE: document.querySelector(".process_column_title"),
 };
 
+// Make 99 colors, I'm too lazy to make this dynamic because it requires to change the structure of the code
+function create_color() {
+	const style = create_element("style", { id: "processes_color", innerText: ":root { " });
+	const colors = new Set();
+	while (colors.size < 99) {
+		const random = Math.floor(Math.random() * 360);
+		colors.add(random);
+	}
+
+	let i = 0;
+	for (let color of colors) {
+		const rand_lgt = Math.floor(Math.random() * (100 - 50) + 50);
+		const rand_sat = Math.floor(Math.random() * 25);
+		style.innerText += `--color-${i}: hsl(${color}, ${rand_sat}%, ${rand_lgt}%);`;
+		i++;
+	}
+
+	style.innerText += " }";
+	document.head.appendChild(style);
+}
+
 function order_enum(obj) {
 	const keys = Object.keys(obj);
 	const ordered_enum = {};
@@ -41,7 +62,6 @@ const PROCESS_ENUM = order_enum({
 
 (() => {
 	const { INSTRUCTION, ACTIONS, ALGORITHM, ARRIVAL, BURST, PRIORITY, PRIORITY_CONTAINER, QUANTUM_CONTAINER, TABLE_COLUMN_TITLE } = ELEMENTS;
-
 	const process_enum_keys = Object.keys(PROCESS_ENUM);
 	let column_title = "";
 	for (let i = 0; i < process_enum_keys.length; i++) {
@@ -85,8 +105,8 @@ const PROCESS_ENUM = order_enum({
 				const burst_count = BURST.children.length;
 				const priority_count = PRIORITY.children.length;
 
-				const rand_value_arrival = Math.floor(Math.random() * 60);
-				const rand_value_burst = Math.floor(Math.random() * 60);
+				const rand_value_arrival = Math.floor(Math.random() * 20);
+				const rand_value_burst = Math.floor(Math.random() * 10);
 				const rand_value_priority = Math.floor(Math.random() * 10);
 
 				const rand_arrival = create_element("div", { className: "time_inputs", innerText: String(rand_value_arrival), contentEditable: "true" });
@@ -119,6 +139,18 @@ const PROCESS_ENUM = order_enum({
 				update_gantt_chart([]);
 				update_table();
 				break;
+			case "enable_color": {
+				const instruction_text = parent.querySelector("span");
+				const processes_color = document.getElementById("processes_color");
+				if (processes_color) {
+					instruction_text.innerText = "Enable color";
+					processes_color.remove();
+				} else {
+					instruction_text.innerText = "Disable color";
+					create_color();
+				}
+				break;
+			}
 			case "practice_mode":
 				const is_practice_on = document.documentElement.classList.contains("practice_on");
 				const instruction_text = parent.querySelector("span");
@@ -394,6 +426,57 @@ function calculate_time(algorithm) {
 	return processes;
 }
 
+function find_grid_cell_division(processes) {
+	const { BT, AT } = PROCESS_ENUM;
+	const max_arrival_time = Math.max(...processes.map((process) => process[AT]));
+	const process = processes[processes.findIndex((process) => process[AT] === max_arrival_time)];
+	return process[BT] + max_arrival_time;
+}
+
+function create_visualization(processes) {
+	if (processes.length === 0) {
+		document.getElementById("processes_grid")?.remove();
+		return;
+	}
+	const { PID, AT, BT } = PROCESS_ENUM;
+	const grid_cell_division = find_grid_cell_division(processes) + 1;
+
+	const processes_grid = create_element("div", { id: "processes_grid" });
+	processes_grid.setAttribute(
+		"style",
+		`
+		display: grid;	
+		gap: 5px 0;	
+		grid-template-rows: repeat(${processes.length}, 1fr);
+		grid-template-columns: repeat(${grid_cell_division}, 1fr);
+	`
+	);
+
+	for (let i = 0; i < grid_cell_division; i++) {
+		processes_grid.appendChild(create_element("div", { className: "grid-visual-header", innerText: i }));
+	}
+
+	for (let process of processes) {
+		const process_el = create_element("div", { innerText: process[PID] + 1 });
+		process_el.setAttribute(
+			"style",
+			`									
+			background-color: var(--color-${process[PID]});
+			border: 1px solid var(--light-gray);			
+			text-align: center;
+			grid-column-start: ${process[AT] + 1};
+			grid-column-end: ${process[AT] + process[BT] + 1};
+		`
+		);
+		processes_grid.appendChild(process_el);
+	}
+
+	console.log(processes_grid);
+
+	document.getElementById("processes_grid")?.remove();
+	document.querySelector(".table").appendChild(processes_grid);
+}
+
 function update_gantt_chart(processes) {
 	const is_practice_on = document.documentElement.classList.contains("practice_on");
 	const { CHART } = ELEMENTS;
@@ -403,7 +486,7 @@ function update_gantt_chart(processes) {
 		style: `grid-template-columns: repeat(${Math.min(10, processes.length)}, 1fr);`,
 	});
 	for (let i = 0; i < processes.length; i++) {
-		const info = create_element("span", { contentEditable: is_practice_on, className: `no_opacity process_order`, innerHTML: `${!is_practice_on ? parseInt(processes[i][PID]) + 1 : ""}` });
+		const info = create_element("span", { contentEditable: is_practice_on, className: `no_opacity process_order`, style: `background-color: var(--color-${processes[i][PID]})`, innerHTML: `${!is_practice_on ? parseInt(processes[i][PID]) + 1 : ""}` });
 		if (is_practice_on) info.dataset.value = parseInt(processes[i][PID]) + 1;
 		gantt_chart.appendChild(info);
 	}
@@ -426,6 +509,8 @@ function update_table() {
 
 	const { PID, AT, BT, CT, TAT, WT, IT, PR } = PROCESS_ENUM;
 	const processes = calculate_time(ALGORITHM.value);
+
+	create_visualization(processes);
 
 	let sum_turnaround = 0;
 	let sum_waiting = 0;
@@ -476,7 +561,12 @@ function update_table() {
 		const process_children = processes_el[i].children;
 
 		for (let k = 0; k < process_children.length; k++) {
-			process_children[k].style = `animation: skyfall ${150 * (i + k)}ms ease 0s 1 normal forwards;`;
+			if (k === 0) {
+				const PID = parseInt(process_children[k].innerText) - 1;
+				process_children[k].style = `background-color: var(--color-${PID}); animation: skyfall ${150 * (i + k)}ms ease 0s 1 normal forwards;`;
+			} else {
+				process_children[k].style = `animation: skyfall ${150 * (i + k)}ms ease 0s 1 normal forwards;`;
+			}
 		}
 	}
 
